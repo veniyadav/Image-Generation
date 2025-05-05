@@ -1,0 +1,8 @@
+flask
+flask_cors
+werkzeug
+langchain
+groq
+requests
+langchain_groq
+pydantic
