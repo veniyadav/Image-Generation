@@ -10,7 +10,7 @@ from utiles.utils import build_system_prompt, ImageProcessing,get_image
 from flask_cors import CORS
 from flask_cors import cross_origin
 
-API_KEY = "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"
+API_KEY = "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"
 client = Groq(api_key=API_KEY)
 
 groq_llm = GroqLLM(model="llama-3.3-70b-versatile", api_key=API_KEY,temperature=0.8)#llama-3.1-8b-instan
