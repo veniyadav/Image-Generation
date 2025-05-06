@@ -1,7 +1,6 @@
 import base64
 from groq import Groq ,GroqError
 import os
-from magic_hour import Client
 from dotenv import load_dotenv
 import requests
 
