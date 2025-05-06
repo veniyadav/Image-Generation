@@ -6,3 +6,4 @@ groq
 requests
 langchain_groq
 pydantic
+python-dotenv
