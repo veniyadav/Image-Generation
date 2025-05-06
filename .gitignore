@@ -4,8 +4,11 @@ test3.py
 test4.py
 test5.py
 TestModels
+image_generate.py
 myenv
+.env
 groq_image_prompt_chat_api.postman_collection.json
 # Ignore Python cache files
-__pycache__/
+utiles\__pycache__
+__pycache__
 *.pyc

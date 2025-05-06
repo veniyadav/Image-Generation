@@ -3,7 +3,7 @@ import requests
 
 app = Flask(__name__)
 
-API_TOKEN= '41803036-2c67-4e62-8c34-a42b47ef7860'
+API_TOKEN= 'your api key     '
 APP_URL="https://api.deepai.org/api/text2img"
 
 @app.route('/text-to-image', methods=['POST'])

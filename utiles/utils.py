@@ -1,6 +1,14 @@
 import base64
 from groq import Groq ,GroqError
 import os
+from magic_hour import Client
+from dotenv import load_dotenv
+import requests
+
+load_dotenv()  # Loads environment variables from .env
+
+api_key_groq = os.getenv("MY_API_KEY")
+api_key_img= os.getenv("MY_IMG_API")
 
 
 def encode_image(image_path):
@@ -56,7 +64,7 @@ def ImageProcessing(imagepath):
     try:
         base64_image = encode_image(image_path=imagepath)
 
-        client = Groq(api_key="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")
+        client = Groq(api_key=api_key_groq)
 
         chat_completion = client.chat.completions.create(
             messages=[
@@ -93,71 +101,17 @@ def ImageProcessing(imagepath):
         return f"Unexpected error: {str(e)}"
 
 
+def get_image(prompt:str):
 
+    req = requests.post(
+        "https://api.deepai.org/api/text2img",
+        data={
+            'text': prompt,
+        },
+        headers={'api-key': api_key_img}
+    )
+    requested_data=req.json()
+    output_url = requested_data.get('output_url')
+    # share_url = requested_data.get('share_url')
 
-import requests
-import time
-def generate_image(prompt: str):
-    url = "https://api.freepik.com/v1/ai/mystic"
-
-    payload = {
-        "structure_strength": 48,
-        "adherence": 50,
-        "hdr": 50,
-        "resolution": "2k",
-        "aspect_ratio": "square_1_1",
-        "model": "realism",
-        "creative_detailing": 33,
-        "engine": "automatic",
-        "fixed_generation": False,
-        "filter_nsfw": True,
-        "prompt": prompt
-    }
-
-    headers = {
-        "x-freepik-api-key": "FPSXa78a40fab6404ffb9c4359a9066eb74f",
-        "Content-Type": "application/json"
-    }
-
-    response = requests.post(url, json=payload, headers=headers)
-
-    # Check for HTTP error
-    if response.status_code != 200:
-        print("Error from Freepik API:")
-        print(response.status_code, response.text)
-        return None, None
-
-    data = response.json()
-    # print("Initial generation response:", data)  # Debug output
-
-    statuscode = data.get("data", {}).get("status")
-    task_id = data.get("data", {}).get("task_id")
-
-    return statuscode, task_id
-
-def get_image(prompt: str):
-    statuscode, task_id = generate_image(prompt)
-    if not task_id:
-        print("Invalid task_id. Exiting.")
-        return None
-
-    headers = {"x-freepik-api-key": "FPSXa78a40fab6404ffb9c4359a9066eb74f"}
-
-    while statuscode == "CREATED" or statuscode == "IN_PROGRESS":
-        # print("Waiting for image generation...")
-        time.sleep(5)
-        response = requests.get(f"https://api.freepik.com/v1/ai/mystic/{task_id}", headers=headers)
-        statuscode = response.json().get("data", {}).get("status")
-
-    response = requests.get(f"https://api.freepik.com/v1/ai/mystic/{task_id}", headers=headers)
-    # print("Image generation completed.")
-    data=response.json()
-
-    generated_images = data.get("data", {}).get("generated", [])
-    if generated_images:
-        image_url = generated_images[0]
-        # print("Here is the generated image:", image_url)
-        return image_url
-    else:
-        print("No image URL found.")
-        return None
+    return output_url

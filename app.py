@@ -9,8 +9,11 @@ from werkzeug.utils import secure_filename
 from utiles.utils import build_system_prompt, ImageProcessing,get_image
 from flask_cors import CORS
 from flask_cors import cross_origin
+from dotenv import load_dotenv
 
-API_KEY = "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"
+load_dotenv()
+
+API_KEY = os.getenv("MY_API_KEY")
 client = Groq(api_key=API_KEY)
 
 groq_llm = GroqLLM(model="llama-3.3-70b-versatile", api_key=API_KEY,temperature=0.8)#llama-3.1-8b-instan
@@ -42,21 +45,14 @@ def generate_image_endpoint():
             return jsonify({"error": "Prompt is required"}), 400
 
         # Generate the image URL
-        image_url = get_image(f"""Generate a hyperrealistic image of a {gender} and age {age} from {nationality} with the following physical features:
+        image_url = get_image(f"""
+    Generate a hyperrealistic full-body image of a {age}-year-old {gender} from {nationality}. She has a {body_shape} body type with a noticeably large butt. Her skin tone is {skin_color}, and she has {eye_color} eyes that are expressive and lifelike. Her hair is {hair_color}, styled in a {hair_style} manner that flows naturally. 
 
-        Body shape: {body_shape}
+    The image should capture realistic lighting, natural shadows, detailed skin texture, and lifelike proportions. Her pose should appear relaxed and confident, and the overall composition should feel grounded in reality, with clothing and background subtly enhancing the realism rather than distracting from it.
+    """)
 
-        Butt size: {butt_size}
 
-        Skin color: {skin_color}
-
-        Eye color: {eye_color}
-
-        Hair color: {hair_color}
-
-        Hairstyle: {hair_style}
-"""
-)  # Call your get_image function
+  # Call your get_image function
 
         if not image_url:
             return jsonify({"error": "Image generation failed"}), 500
@@ -65,52 +61,8 @@ def generate_image_endpoint():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-# @app.route("/analyze_image_prompt", methods=["POST"])
-# @cross_origin()
-# def analyze_image():
-#     if "image" not in request.files:
-#         return jsonify({"error": "No image file uploaded"}), 400
-
-#     image_file = request.files["image"]
-#     if image_file.filename == "":
-#         return jsonify({"error": "Empty filename"}), 400
-
-#     # Extract user-provided form data
-#     name = request.form.get("name", "Unknown")
-#     age = request.form.get("age", "Unknown")
-#     relationship_status = request.form.get("relationship_status", "friend")
-#     tone = request.form.get("tone", "neutral")
-#     way_of_talking = request.form.get("way_of_talking", "normal")
-#     nature_type = request.form.get("nature_type", "undisclosed")
-
-#     # Save the uploaded image
-#     filename = secure_filename(image_file.filename)
-#     file_path = os.path.join("uploads", filename)
-#     os.makedirs("uploads", exist_ok=True)
-#     image_file.save(file_path)
-
-#     try:
-#         # Get a description of the person from the image
-#         physical_description = ImageProcessing(file_path)
-
-#         # Build the system prompt
-#         system_prompt = build_system_prompt(
-#             name, age, relationship_status, tone, way_of_talking, nature_type, physical_description
-#         )
-
-#         return jsonify({
-#             "system_prompt": system_prompt,
-#             "image_analysis": physical_description
-#         })
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-#     finally:
-#         if os.path.exists(file_path):
-#             os.remove(file_path)
-
+    
+#image analysis route
 @app.route("/analyze_image_prompt", methods=["POST"])
 @cross_origin()
 def analyze_image():
@@ -165,12 +117,9 @@ def analyze_image():
     personality2=request.form.get("personality2","naughty")
     personality3=request.form.get("personality3","bold")
 
-
-
     try:
         # Analyze the image
         physical_description = ImageProcessing(file_path)
-
         # Build system prompt
         system_prompt = build_system_prompt(
            name, age, gender ,language,relationship_status, tone, way_of_talking, nature_type, physical_description,personality1,personality2,personality3
