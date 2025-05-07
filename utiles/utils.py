@@ -4,6 +4,8 @@ import os
 from magic_hour import Client
 from dotenv import load_dotenv
 import requests
+import time
+
 
 load_dotenv()  # Loads environment variables from .env
 
@@ -101,17 +103,30 @@ def ImageProcessing(imagepath):
         return f"Unexpected error: {str(e)}"
 
 
-def get_image(prompt:str):
+def get_image(prompt: str, max_retries: int = 5, wait_seconds: int = 3):
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            response = requests.post(
+                "https://api.deepai.org/api/text2img",
+                data={'text': prompt},
+                headers={'api-key': api_key_img}
+            )
+            response.raise_for_status()  # Raise if HTTP error
 
-    req = requests.post(
-        "https://api.deepai.org/api/text2img",
-        data={
-            'text': prompt,
-        },
-        headers={'api-key': api_key_img}
-    )
-    requested_data=req.json()
-    output_url = requested_data.get('output_url')
-    # share_url = requested_data.get('share_url')
+            data = response.json()
+            output_url = data.get('output_url')
 
-    return output_url
+            if output_url:
+                return output_url
+
+            print(f"[Attempt {attempt+1}] No image URL returned. Retrying...")
+
+        except Exception as e:
+            print(f"[Attempt {attempt+1}] Error: {e}. Retrying...")
+
+        attempt += 1
+        time.sleep(wait_seconds)
+
+    print("Image generation failed after retries.")
+    return None

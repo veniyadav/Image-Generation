@@ -12,3 +12,4 @@ Flask-Migrate
 Flask-JWT-Extended
 Flask-SocketIO
 eventlet
+pymysql

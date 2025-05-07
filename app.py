@@ -25,8 +25,10 @@ app = Flask(__name__)
 
 #DBCONFIGER
 # Local MySQL Database Configuration (fallback to SQLite for development)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///test.db')
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/image_generation'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:dtyxtGrcajPlvDLILFCfgVdWFwwCvTdD@metro.proxy.rlwy.net:41157/railway'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+
 # Set a secret key for JWT (change this in production)
 app.config['JWT_SECRET_KEY'] = 'super-secret-key'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
@@ -183,7 +185,6 @@ def generate_image_endpoint():
         # Construct the prompt
         prompt = f"""
         Generate a hyperrealistic full-body image of a {age}-year-old {gender} from {nationality}. She has a {body_shape} body type with a noticeably large butt. Her skin tone is {skin_color}, and she has {eye_color} eyes that are expressive and lifelike. Her hair is {hair_color}, styled in a {hair_style} manner that flows naturally.
-
         The image should capture realistic lighting, natural shadows, detailed skin texture, and lifelike proportions. Her pose should appear relaxed and confident, and the overall composition should feel grounded in reality, with clothing and background subtly enhancing the realism rather than distracting from it.
         """
 
