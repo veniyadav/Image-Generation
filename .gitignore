@@ -12,3 +12,5 @@ groq_image_prompt_chat_api.postman_collection.json
 utiles\__pycache__
 __pycache__
 *.pyc
+instance
+migrations

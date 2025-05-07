@@ -6,3 +6,9 @@ groq
 requests
 langchain_groq
 pydantic
+python-dotenv
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-JWT-Extended
+Flask-SocketIO
+eventlet
