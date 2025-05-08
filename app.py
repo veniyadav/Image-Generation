@@ -47,6 +47,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 jwt = JWTManager(app)
 socketio = SocketIO(app, cors_allowed_origins="*")  # For development only
 
+CORS(app, resources={r"/*": {"origins": "*"}},
+     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+     supports_credentials=True,
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 load_dotenv()
 
@@ -54,14 +58,18 @@ API_KEY = os.getenv("MY_API_KEY")
 client = Groq(api_key=API_KEY)
 
 groq_llm = GroqLLM(model="llama-3.3-70b-versatile", api_key=API_KEY,temperature=0.8)#llama-3.1-8b-instan
-CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 
 #register login and password change routes****************
  
 @app.route('/register', methods=['POST'])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 def UserRegistration():
     data = request.get_json()
     if not data:
@@ -93,7 +101,12 @@ def UserRegistration():
     return jsonify({'message':'User Registered Succesfully','email':Email,'name':Name}), 201
  
 @app.route('/Login', methods=['POST'])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 def User_login():
     data = request.get_json()
     if not data:
@@ -114,7 +127,12 @@ def User_login():
     return jsonify({'message': 'Login successful', 'access_token': access_token, "user_id":user.id, "user_name":user.name, "user_email":user.email}), 200
  
 @app.route('/password_change', methods=['PUT'])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 @jwt_required()
 def User_Password_Change():
     data = request.get_json()
@@ -139,7 +157,12 @@ def User_Password_Change():
 
  
 @app.route('/getusers', methods=['GET'])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 def get_users():
     user_id = request.args.get('user_id')
     user_email = request.args.get('user_email')
@@ -162,7 +185,12 @@ def get_users():
 
 
 @app.route('/text-to-image', methods=['POST'])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 @jwt_required()
 def generate_image_endpoint():
     try:
@@ -226,7 +254,12 @@ def generate_image_endpoint():
     
 #image analysis route
 @app.route("/analyze_image_prompt", methods=["POST"])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 @jwt_required()
 def analyze_image():
     # image_file = request.files.get("image")
@@ -299,7 +332,12 @@ def analyze_image():
         #     os.remove(file_path)
 
 @app.route("/image_data", methods=["GET"])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 @jwt_required()
 def get_images():
     # Get optional query parameters
@@ -336,7 +374,12 @@ def get_images():
 
 
 @app.route("/chat", methods=["POST"])
-@cross_origin()
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 @jwt_required()
 def chat():
     data = request.get_json()
