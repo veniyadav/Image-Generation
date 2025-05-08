@@ -109,7 +109,7 @@ def User_login():
 
     # Create access token
     access_token = create_access_token(identity=str(user.id))
-    return jsonify({'message': 'Login successful', 'access_token': access_token, "user_id":user.id}), 200
+    return jsonify({'message': 'Login successful', 'access_token': access_token, "user_id":user.id, "user_name":user.name, "user_email":user.email}), 200
  
 @app.route('/password_change', methods=['PUT'])
 @jwt_required()
@@ -183,10 +183,22 @@ def generate_image_endpoint():
             return jsonify({"error": "At least one descriptive field is required"}), 400
 
         # Construct the prompt
-        prompt = f"""
-        Generate a hyperrealistic full-body image of a {age}-year-old {gender} from {nationality}. She has a {body_shape} body type with a noticeably large butt. Her skin tone is {skin_color}, and she has {eye_color} eyes that are expressive and lifelike. Her hair is {hair_color}, styled in a {hair_style} manner that flows naturally.
-        The image should capture realistic lighting, natural shadows, detailed skin texture, and lifelike proportions. Her pose should appear relaxed and confident, and the overall composition should feel grounded in reality, with clothing and background subtly enhancing the realism rather than distracting from it.
+        if gender.lower() == "boy":
+            prompt = f"""
+        Generate a hyperrealistic full-body image of a {age}-year-old {gender} from {nationality}. 
+        He has a {body_shape} body type with well-defined features. His skin tone is {skin_color}, and he has {eye_color} eyes that are expressive and lifelike. 
+        His hair is {hair_color}, styled in a {hair_style} manner that suits his personality.
+
+        The image should capture realistic lighting, natural shadows, detailed skin texture, and lifelike proportions. 
+        His pose should appear relaxed and confident, and the overall composition should feel grounded in reality, 
+        with clothing and background subtly enhancing the realism rather than distracting from it.
         """
+            
+        else:
+           prompt = f"""
+            Generate a hyperrealistic full-body image of a {age}-year-old {gender} from {nationality}. She has a {body_shape} body type with a noticeably {butt_size} butt and {breast_size} curves . Her skin tone is {skin_color}, and she has {eye_color} eyes that are expressive and lifelike. Her hair is {hair_color}, styled in a {hair_style} manner that flows naturally.
+            The image should capture realistic lighting, natural shadows, detailed skin texture, and lifelike proportions. Her pose should appear relaxed and confident, and the overall composition should feel grounded in reality, with clothing and background subtly enhancing the realism rather than distracting from it.
+            """
 
         # Generate the image (replace this with your actual image generation call)
         image_url = get_image(prompt)
@@ -312,7 +324,7 @@ def get_images():
             "id": img.id,
             "user_id": img.user_id,
             "image_url": img.image_url,
-            "prompt": img.prompt,
+            "prompt": img.prompt,   
             "timestamp": img.timestamp
         })
 
