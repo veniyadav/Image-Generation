@@ -61,6 +61,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 #register login and password change routes****************
  
 @app.route('/register', methods=['POST'])
+@cross_origin()
 def UserRegistration():
     data = request.get_json()
     if not data:
@@ -92,6 +93,7 @@ def UserRegistration():
     return jsonify({'message':'User Registered Succesfully','email':Email,'name':Name}), 201
  
 @app.route('/Login', methods=['POST'])
+@cross_origin()
 def User_login():
     data = request.get_json()
     if not data:
@@ -112,6 +114,7 @@ def User_login():
     return jsonify({'message': 'Login successful', 'access_token': access_token, "user_id":user.id, "user_name":user.name, "user_email":user.email}), 200
  
 @app.route('/password_change', methods=['PUT'])
+@cross_origin()
 @jwt_required()
 def User_Password_Change():
     data = request.get_json()
@@ -136,6 +139,7 @@ def User_Password_Change():
 
  
 @app.route('/getusers', methods=['GET'])
+@cross_origin()
 def get_users():
     user_id = request.args.get('user_id')
     user_email = request.args.get('user_email')
