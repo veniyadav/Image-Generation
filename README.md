@@ -56,6 +56,7 @@ Generates an image based on the text prompt using the DeepAI API.
 
 #### 📥 Request Body (JSON)
 
+
     {
     "prompt": "a futuristic robot reading a book"
     }
@@ -86,6 +87,7 @@ Generates an image based on the text prompt using the DeepAI API.
 | `Content-Type` | `application/json`  |
 
 #### 📥 Request Body (JSON)
+
 
     {
     "prompt": "a futuristic robot reading a book"

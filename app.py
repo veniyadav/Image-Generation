@@ -61,6 +61,7 @@ groq_llm = GroqLLM(model="llama-3.3-70b-versatile", api_key=API_KEY,temperature=
 
 
 
+
 #register login and password change routes****************
  
 @app.route('/register', methods=['POST'])
@@ -90,15 +91,17 @@ def UserRegistration():
  
     #hashing the password
     hashed_password = generate_password_hash(Password, method='pbkdf2:sha256')
+    initial_tokens=200
 
     #creating a new user
     new_user = User(name=Name,
                         email=Email,
-                        password=hashed_password)
+                        password=hashed_password,
+                        tokens=initial_tokens) #initialize the token to new user account
     db.session.add(new_user)
     db.session.commit()
  
-    return jsonify({'message':'User Registered Succesfully','email':Email,'name':Name}), 201
+    return jsonify({'message':'User Registered Succesfully', 'email':Email,'name':Name, 'Tokens':initial_tokens}), 201
  
 @app.route('/Login', methods=['POST'])
 @cross_origin(
@@ -124,7 +127,7 @@ def User_login():
 
     # Create access token
     access_token = create_access_token(identity=str(user.id))
-    return jsonify({'message': 'Login successful', 'access_token': access_token, "user_id":user.id, "user_name":user.name, "user_email":user.email}), 200
+    return jsonify({'message': 'Login successful', 'access_token': access_token, "user_id":user.id, "user_name":user.name, "user_email":user.email, "Remaining tokens": user.tokens}), 200
  
 @app.route('/password_change', methods=['PUT'])
 @cross_origin(
@@ -177,12 +180,30 @@ def get_users():
     users = []
     for user in data:
         users.append({
-            'id': user.id,
+            'user_id': user.id,
             'name': user.name,
-            'email': user.email
+            'email': user.email,
+            'tokens':user.tokens
         })
     return jsonify(users), 200
 
+@app.route('/get_tokens',methods=['GET'])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+def get_tokens():
+    user_id = request.args.get("user_id")
+
+    if not user_id:
+        return jsonify({"error":"User ID required"})
+    
+    #check user in database
+    filter_id = User.query.filter_by(id=user_id).first()
+
+    return jsonify({"token_count": filter_id.tokens})
 
 @app.route('/text-to-image', methods=['POST'])
 @cross_origin(
@@ -196,6 +217,13 @@ def generate_image_endpoint():
     try:
         data = request.get_json()
         user_id = data.get("user_id")
+
+        #Fetch user from the database
+        user = User.query.filter_by(id=user_id).first()
+        if not user:
+            return jsonify({"error":"User not found"}),404
+        
+        #check if the user has enough tokens
 
         body_shape = data.get("body_shape")
         breast_size = data.get("breast_size")
@@ -237,6 +265,15 @@ def generate_image_endpoint():
 
         if not image_url:
             return jsonify({"error": "Image generation failed"}), 500
+    
+        if user.tokens < 10:
+            return jsonify({"error":"Insufficient tokens, Please add more tokends to your account"})
+        
+        #deduction per image
+        if image_url:
+            new_tokens=user.tokens - 10
+            user.tokens = new_tokens
+        
 
         # Save to database
         image_entry = ImageData(
@@ -247,7 +284,7 @@ def generate_image_endpoint():
         db.session.add(image_entry)
         db.session.commit()
 
-        return jsonify({"image_url": image_url}), 200
+        return jsonify({"image_url": image_url, "Remaining tokens": user.tokens}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -409,6 +446,39 @@ def chat():
     response = chain.invoke({})
 
     return jsonify({"response": response})
+
+
+@app.route('/add_token', methods =['PUT'])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+@jwt_required()
+def add_tokens():
+    try :
+        data  = request.get_json()
+        user_id = data.get("user_id")
+
+        if not user_id:
+            return jsonify({"error":" User ID required"}),404
+        
+        #detect user from the database
+        user =  User.query.filter_by(id=user_id).first()
+        if not user:
+            return jsonify({"error":"User not found"})
+         
+        #adding 100 tokens to the user's account
+        user.tokens += 100
+        db.session.commit()
+        return jsonify({"message":"Tokens added successfully", "user_id": user_id, "New_added_tokens": user.tokens}), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}) ,500
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0",port=8001)
