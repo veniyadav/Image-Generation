@@ -410,44 +410,6 @@ def get_images():
     return jsonify(result), 200
 
 
-@app.route("/chat", methods=["POST"])
-@cross_origin(
-    origins="*",
-    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
-    supports_credentials=True,
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-)
-@jwt_required()
-def chat():
-    data = request.get_json()
-
-    # Validate input
-    if not data or "image_id" not in data or "human_msg" not in data:
-        return jsonify({"error": "Missing required parameters: image_id and human_msg"}), 400
-
-    image_id = data["image_id"]
-    human_msg = data["human_msg"]
-
-    # Fetch prompt from DB using image_id
-    image_data = ImageData.query.filter_by(id=image_id).first()
-    if not image_data:
-        return jsonify({"error": "Image ID not found"}), 404
-
-    system_prompt = image_data.prompt
-
-    # Construct chat prompt
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt.strip()),
-        ("human", human_msg.strip())
-    ])
-
-    # Create chain and invoke
-    chain = prompt | groq_llm
-    response = chain.invoke({})
-
-    return jsonify({"response": response})
-
-
 @app.route('/add_token', methods =['PUT'])
 @cross_origin(
     origins="*",
@@ -477,8 +439,128 @@ def add_tokens():
     except Exception as e:
         return jsonify({"error": str(e)}) ,500
 
+@app.route("/chat", methods=["POST"])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+@jwt_required()
+def chat():
+    data = request.get_json()
 
+    # Validate input
+    if not data or "image_id" not in data or "human_msg" not in data or "user_id" not in data:
+        return jsonify({"error": "Missing required parameters: image_id, human_msg, or user_id"}), 400
 
+    # Extract parameters
+    receiver_id = data.get("image_id")
+    sender_id = data.get("user_id")
+    human_msg = data.get("human_msg")
+
+    # Fetch prompt from DB using image_id
+    image_data = ImageData.query.filter_by(id=receiver_id).first()
+    chat_data = Chat_messages.query.filter_by(id=sender_id).first()
+
+    # Check if image data exists
+    if not image_data and not chat_data :
+        return jsonify({"error": "Data not found"}), 404
+
+    s_prompt = image_data.prompt
+    system_prompt = s_prompt.strip() if s_prompt else s_prompt
+
+    # Construct chat prompt
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", human_msg.strip())
+    ])
+
+    # Create chain and invoke
+    chain = prompt | groq_llm
+    response = chain.invoke({})
+
+    # Determine sender and receiver
+    sender_is_user = True  # Assuming the user is the sender
+    receiver_is_user = False  # Assuming the AI is the receiver
+
+    # Store the conversation
+    new_chat = Chat_messages(
+        sender_id=sender_id,
+        receiver_id=receiver_id,
+        message=human_msg,
+        is_sender=sender_is_user
+    )
+    db.session.add(new_chat)
+    db.session.commit()
+
+    # Store the AI's response
+    new_chat = Chat_messages(
+        sender_id=receiver_id,
+        receiver_id=sender_id,
+        message=response,
+        is_sender=receiver_is_user
+    )
+    db.session.add(new_chat)
+    db.session.commit()
+
+    return jsonify({"response": response})
+
+@app.route("/chat_history", methods=["GET"])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+@jwt_required()
+def get_conversation():
+    user_id=request.args.get('user_id')
+    image_id=request.args.get("image_id")
+    if not user_id and not image_id:
+        return jsonify({"error" : "User_id and image_id required"})
+    
+    conversation = Chat_messages.query.filter(
+        ((Chat_messages.sender_id == user_id) & (Chat_messages.receiver_id == image_id)) |
+        ((Chat_messages.sender_id == image_id) & (Chat_messages.receiver_id == user_id))
+    ).order_by(Chat_messages.timestamp).all()
+
+    messages = [{"sender": c.sender_id, "message": c.message ,"timestamp": c.timestamp.isoformat()} for c in conversation]
+    return jsonify(messages)
+ 
+@app.route("/delete_chat", methods=["DELETE"])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+@jwt_required()
+def delete_chat():
+    data= request.get_json()
+    sender_id=data.get("sender_id")
+    receiver_id=data.get("reciver_id")
+ 
+    # Validate input
+    if not sender_id or not receiver_id:
+        return jsonify({"error": " ID is required"}), 400
+   
+    # Fetch chat messages from the database
+    chat_messages = Chat_messages.query.filter(
+        ((Chat_messages.sender_id == sender_id) & (Chat_messages.receiver_id == receiver_id)) |
+        ((Chat_messages.sender_id == receiver_id) & (Chat_messages.receiver_id == sender_id))
+    ).order_by(Chat_messages.timestamp).all()
+   
+    if not chat_messages:
+        return jsonify({"error": "No chat messages found"}), 404
+   
+    # Delete chat messages
+    for message in chat_messages:
+        db.session.delete(message)
+    db.session.commit()
+ 
+    return jsonify({"message": "Chat messages deleted successfully"}), 200
+   
 
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0",port=8001)

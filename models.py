@@ -20,3 +20,12 @@ class ImageData(db.Model):
     image_url = db.Column(db.String(1000), nullable=False)
     prompt = db.Column(db.String(5000), nullable=True)
     timestamp = db.Column(db.String(100), nullable=False)
+
+class Chat_messages(db.Model):
+    __tablename__ = 'chat_message'
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.String(64), nullable=False)
+    receiver_id = db.Column(db.String(64), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    is_sender = db.Column(db.Boolean, nullable=False) 
