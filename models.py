@@ -18,6 +18,7 @@ class ImageData(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.String(1000), nullable=False)
     image_url = db.Column(db.String(1000), nullable=False)
+    image_name = db.Column(db.String(1000), nullable=True)
     prompt = db.Column(db.String(5000), nullable=True)
     timestamp = db.Column(db.String(100), nullable=False)
 

@@ -101,7 +101,7 @@ def UserRegistration():
     db.session.add(new_user)
     db.session.commit()
  
-    return jsonify({'message':'User Registered Succesfully', 'email':Email,'name':Name, 'Tokens':initial_tokens}), 201
+    return jsonify({'message':'User Registered Succesfully', 'email':Email,'name':Name, 'Tokens':initial_tokens}), 200
  
 @app.route('/Login', methods=['POST'])
 @cross_origin(
@@ -351,12 +351,14 @@ def analyze_image():
         image_data = ImageData.query.filter_by(image_url=image_url).first()
         if image_data:
             image_data.prompt = system_prompt
+            image_data.image_name = name
             db.session.commit()
 
         return jsonify({
             "message": "Prompt updated successfully" if image_data else "Image URL not found in database",
             "image_analysis": physical_description,
-            "system_prompt": system_prompt
+            "system_prompt": system_prompt,
+            "image_name" : name
         })
 
     except Exception as e:
@@ -403,6 +405,7 @@ def get_images():
             "id": img.id,
             "user_id": img.user_id,
             "image_url": img.image_url,
+            "image_name": img.image_name,
             "prompt": img.prompt,   
             "timestamp": img.timestamp
         })
