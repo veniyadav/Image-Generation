@@ -11,6 +11,7 @@ from flask_cors import CORS
 from flask_cors import cross_origin
 from dotenv import load_dotenv
 import os
+import json
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify,send_from_directory, abort
 from flask_migrate import Migrate
@@ -464,16 +465,16 @@ def chat():
     sender_id = data.get("user_id")
     human_msg = data.get("human_msg")
 
+
     # check human message should not be empty
     if not human_msg:
         return jsonify({"error": "Empty message! Please write something!"}), 400
 
     # Fetch prompt from DB using image_id
     image_data = ImageData.query.filter_by(id=receiver_id).first()
-    chat_data = Chat_messages.query.filter_by(id=sender_id).first()
 
     # Check if image data exists
-    if not image_data or not chat_data :
+    if not image_data :
         return jsonify({"error": "Data not found"}), 404
 
     s_prompt = image_data.prompt
@@ -593,44 +594,44 @@ def chat():
 #     }, to=room_name)
 
 #     return jsonify({"response": response})
-
-@socketio.on("join_room")
-def handle_join(data):
-    user_id = data.get("user_id")
-    image_id = data.get("image_id")
-
-    if not user_id or not image_id:
-        emit("error", {"error": "Missing user_id or image_id"})
-        return
-
-    room = f"{user_id}_{image_id}"
-    join_room(room)
-    emit("joined", {"room": room}, room=room)
-
-
-@socketio.on("get_chat_history")
-@jwt_required()
+@socketio.on("chat_history")
+# @jwt_required()  # Protect the event with JWT authentication
 def handle_chat_history(data):
-    user_id = data.get("user_id")
-    image_id = data.get("image_id")
-    room = f"{user_id}_{image_id}"
+    try:
+        # If data is a string, parse it into a dictionary
+        if isinstance(data, str):
+            data = json.loads(data)
+        
+        print("Received data:", data)  # Log the incoming data to verify the event
+        
+        # Get user_id and image_id from the incoming data
+        user_id = data.get("user_id")
+        image_id = data.get("image_id")
 
-    if not user_id or not image_id:
-        emit("chat_history", {"error": "User_id and image_id required"}, room=room)
-        return
+        # Check for missing data and emit error
+        if not user_id or not image_id:
+            emit("chat_history", {"error": "User_id and image_id required"})
+            return
 
-    conversation = Chat_messages.query.filter(
-        ((Chat_messages.sender_id == user_id) & (Chat_messages.receiver_id == image_id)) |
-        ((Chat_messages.sender_id == image_id) & (Chat_messages.receiver_id == user_id))
-    ).order_by(Chat_messages.timestamp).all()
+        # Fetch the conversation from the database (adjust your query based on your model)
+        conversation = Chat_messages.query.filter(
+            ((Chat_messages.sender_id == user_id) & (Chat_messages.receiver_id == image_id)) |
+            ((Chat_messages.sender_id == image_id) & (Chat_messages.receiver_id == user_id))
+        ).order_by(Chat_messages.timestamp).all()
 
-    messages = [{
-        "sender": msg.sender_id,
-        "message": msg.message,
-        "timestamp": msg.timestamp.isoformat()
-    } for msg in conversation]
+        # Format messages
+        messages = [{
+            "sender": msg.sender_id,
+            "message": msg.message,
+            "timestamp": msg.timestamp.isoformat()
+        } for msg in conversation]
 
-    emit("chat_history", {"messages": messages}, room=room)
+        # Emit the chat history back to the client
+        emit("chat_history", {"messages": messages})
+
+    except Exception as e:
+        print("Error handling chat history:", e)
+        emit("chat_history", {"error": "An error occurred while fetching the chat history"})
 
 
 # @app.route("/chat_history", methods=["GET"])
