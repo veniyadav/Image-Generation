@@ -441,91 +441,9 @@ def add_tokens():
         return jsonify({"message":"Tokens added successfully", "user_id": user_id, "New_added_tokens": user.tokens}), 200
     
     except Exception as e:
-        return jsonify({"error": str(e)}) ,500
-
-# @app.route("/chat", methods=["POST"])
-# @cross_origin(
-#     origins="*",
-#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
-#     supports_credentials=True,
-#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-# )
-# @jwt_required()
-# def chat():
-#     data = request.get_json()
-
-#     # Validate input
-#     if not data or "image_id" not in data or "human_msg" not in data or "user_id" not in data:
-#         return jsonify({"error": "Missing required parameters: image_id, human_msg, or user_id"}), 400
-
-#     # Extract parameters
-#     receiver_id = data.get("image_id")
-#     sender_id = data.get("user_id")
-#     human_msg = data.get("human_msg")
-
-#     # check human message should not be empty
-#     if not human_msg:
-#         return jsonify({"error": "Empty message! Please write something!"}), 400
-
-#     # Fetch prompt from DB using image_id
-#     image_data = ImageData.query.filter_by(id=receiver_id).first()
-#     chat_data = Chat_messages.query.filter_by(id=sender_id).first()
-
-#     # Check if image data exists
-#     if not image_data or not chat_data :
-#         return jsonify({"error": "Data not found"}), 404
-
-#     s_prompt = image_data.prompt
-#     system_prompt = s_prompt.strip() if s_prompt else s_prompt
-
-#     # Construct chat prompt
-#     prompt = ChatPromptTemplate.from_messages([
-#         ("system", system_prompt),
-#         ("human", human_msg.strip())
-#     ])
-
-#     # Create chain and invoke
-#     chain = prompt | groq_llm
-#     response = chain.invoke({})
-
-#     # Determine sender and receiver
-#     sender_is_user = True  # Assuming the user is the sender
-#     receiver_is_user = False  # Assuming the AI is the receiver
-
-#     # Store the conversation
-#     new_chat = Chat_messages(
-#         sender_id=sender_id,
-#         receiver_id=receiver_id,
-#         message=human_msg,
-#         is_sender=sender_is_user
-#     )
-#     db.session.add(new_chat)
-#     db.session.commit()
-
-#     # Store the AI's response
-#     new_chat = Chat_messages(
-#         sender_id=receiver_id,
-#         receiver_id=sender_id,
-#         message=response,
-#         is_sender=receiver_is_user
-#     )
-#     db.session.add(new_chat)
-#     db.session.commit()
-
-#     return jsonify({"response": response})
-
-@socketio.on("join_room")
-def handle_join_room(data):
-    user_id = data.get("user_id")
-    image_id = data.get("image_id")
-    if user_id and image_id:
-        room_name = f"chat_{min(user_id, image_id)}_{max(user_id, image_id)}"
-        join_room(room_name)
-        print(f"User {user_id} joined room {room_name}")
-        emit("joined", {"room": room_name})
+        return jsonify({"error": str(e)}),500
 
 
-# ROUTE: Chat with Real-Time Emit
 @app.route("/chat", methods=["POST"])
 @cross_origin(
     origins="*",
@@ -536,85 +454,206 @@ def handle_join_room(data):
 @jwt_required()
 def chat():
     data = request.get_json()
+
+    # Validate input
     if not data or "image_id" not in data or "human_msg" not in data or "user_id" not in data:
-        return jsonify({"error": "Missing required parameters"}), 400
+        return jsonify({"error": "Missing required parameters: image_id, human_msg, or user_id"}), 400
 
-    sender_id = int(data["user_id"])
-    receiver_id = int(data["image_id"])
-    human_msg = data["human_msg"]
+    # Extract parameters
+    receiver_id = data.get("image_id")
+    sender_id = data.get("user_id")
+    human_msg = data.get("human_msg")
 
+    # check human message should not be empty
+    if not human_msg:
+        return jsonify({"error": "Empty message! Please write something!"}), 400
+
+    # Fetch prompt from DB using image_id
     image_data = ImageData.query.filter_by(id=receiver_id).first()
-    if not image_data:
-        return jsonify({"error": "Image not found"}), 404
+    chat_data = Chat_messages.query.filter_by(id=sender_id).first()
 
-    system_prompt = (image_data.prompt or "").strip()
+    # Check if image data exists
+    if not image_data or not chat_data :
+        return jsonify({"error": "Data not found"}), 404
+
+    s_prompt = image_data.prompt
+    system_prompt = s_prompt.strip() if s_prompt else s_prompt
+
+    # Construct chat prompt
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("human", human_msg.strip())
     ])
+
+    # Create chain and invoke
     chain = prompt | groq_llm
     response = chain.invoke({})
 
-    # Store and emit user message
-    human_entry = Chat_messages(
+    # Determine sender and receiver
+    sender_is_user = True  # Assuming the user is the sender
+    receiver_is_user = False  # Assuming the AI is the receiver
+
+    # Store the conversation
+    new_chat = Chat_messages(
         sender_id=sender_id,
         receiver_id=receiver_id,
         message=human_msg,
-        is_sender=True
+        is_sender=sender_is_user
     )
-    db.session.add(human_entry)
+    db.session.add(new_chat)
     db.session.commit()
 
-    # Store and emit AI response
-    ai_entry = Chat_messages(
+    # Store the AI's response
+    new_chat = Chat_messages(
         sender_id=receiver_id,
         receiver_id=sender_id,
         message=response,
-        is_sender=False
+        is_sender=receiver_is_user
     )
-    db.session.add(ai_entry)
+    db.session.add(new_chat)
     db.session.commit()
-
-    # Emit to room
-    room_name = f"chat_{min(sender_id, receiver_id)}_{max(sender_id, receiver_id)}"
-    socketio.emit("new_message", {
-        "sender_id": sender_id,
-        "receiver_id": receiver_id,
-        "message": human_msg,
-        "timestamp": human_entry.timestamp.isoformat()
-    }, to=room_name)
-
-    socketio.emit("new_message", {
-        "sender_id": receiver_id,
-        "receiver_id": sender_id,
-        "message": response,
-        "timestamp": ai_entry.timestamp.isoformat()
-    }, to=room_name)
 
     return jsonify({"response": response})
 
+# @socketio.on("join_room")
+# def handle_join_room(data):
+#     user_id = data.get("user_id")
+#     image_id = data.get("image_id")
+#     if user_id and image_id:
+#         room_name = f"chat_{min(user_id, image_id)}_{max(user_id, image_id)}"
+#         join_room(room_name)
+#         print(f"User {user_id} joined room {room_name}")
+#         emit("joined", {"room": room_name})
 
-@app.route("/chat_history", methods=["GET"])
-@cross_origin(
-    origins="*",
-    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
-    supports_credentials=True,
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-)
+
+# # ROUTE: Chat with Real-Time Emit
+# @app.route("/chat", methods=["POST"])
+# @cross_origin(
+#     origins="*",
+#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+#     supports_credentials=True,
+#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+# )
+# @jwt_required()
+# def chat():
+#     data = request.get_json()
+#     if not data or "image_id" not in data or "human_msg" not in data or "user_id" not in data:
+#         return jsonify({"error": "Missing required parameters"}), 400
+
+#     sender_id = int(data["user_id"])
+#     receiver_id = int(data["image_id"])
+#     human_msg = data["human_msg"]
+
+#     image_data = ImageData.query.filter_by(id=receiver_id).first()
+#     if not image_data:
+#         return jsonify({"error": "Image not found"}), 404
+
+#     system_prompt = (image_data.prompt or "").strip()
+#     prompt = ChatPromptTemplate.from_messages([
+#         ("system", system_prompt),
+#         ("human", human_msg.strip())
+#     ])
+#     chain = prompt | groq_llm
+#     response = chain.invoke({})
+
+#     # Store and emit user message
+#     human_entry = Chat_messages(
+#         sender_id=sender_id,
+#         receiver_id=receiver_id,
+#         message=human_msg,
+#         is_sender=True
+#     )
+#     db.session.add(human_entry)
+#     db.session.commit()
+
+#     # Store and emit AI response
+#     ai_entry = Chat_messages(
+#         sender_id=receiver_id,
+#         receiver_id=sender_id,
+#         message=response,
+#         is_sender=False
+#     )
+#     db.session.add(ai_entry)
+#     db.session.commit()
+
+#     # Emit to room
+#     room_name = f"chat_{min(sender_id, receiver_id)}_{max(sender_id, receiver_id)}"
+#     socketio.emit("new_message", {
+#         "sender_id": sender_id,
+#         "receiver_id": receiver_id,
+#         "message": human_msg,
+#         "timestamp": human_entry.timestamp.isoformat()
+#     }, to=room_name)
+
+#     socketio.emit("new_message", {
+#         "sender_id": receiver_id,
+#         "receiver_id": sender_id,
+#         "message": response,
+#         "timestamp": ai_entry.timestamp.isoformat()
+#     }, to=room_name)
+
+#     return jsonify({"response": response})
+
+@socketio.on("join_room")
+def handle_join(data):
+    user_id = data.get("user_id")
+    image_id = data.get("image_id")
+
+    if not user_id or not image_id:
+        emit("error", {"error": "Missing user_id or image_id"})
+        return
+
+    room = f"{user_id}_{image_id}"
+    join_room(room)
+    emit("joined", {"room": room}, room=room)
+
+
+@socketio.on("get_chat_history")
 @jwt_required()
-def get_conversation():
-    user_id=request.args.get('user_id')
-    image_id=request.args.get("image_id")
-    if not user_id and not image_id:
-        return jsonify({"error" : "User_id and image_id required"})
-    
+def handle_chat_history(data):
+    user_id = data.get("user_id")
+    image_id = data.get("image_id")
+    room = f"{user_id}_{image_id}"
+
+    if not user_id or not image_id:
+        emit("chat_history", {"error": "User_id and image_id required"}, room=room)
+        return
+
     conversation = Chat_messages.query.filter(
         ((Chat_messages.sender_id == user_id) & (Chat_messages.receiver_id == image_id)) |
         ((Chat_messages.sender_id == image_id) & (Chat_messages.receiver_id == user_id))
     ).order_by(Chat_messages.timestamp).all()
 
-    messages = [{"sender": c.sender_id, "message": c.message ,"timestamp": c.timestamp.isoformat()} for c in conversation]
-    return jsonify(messages)
+    messages = [{
+        "sender": msg.sender_id,
+        "message": msg.message,
+        "timestamp": msg.timestamp.isoformat()
+    } for msg in conversation]
+
+    emit("chat_history", {"messages": messages}, room=room)
+
+
+# @app.route("/chat_history", methods=["GET"])
+# @cross_origin(
+#     origins="*",
+#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+#     supports_credentials=True,
+#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+# )
+# @jwt_required()
+# def get_conversation():
+#     user_id=request.args.get('user_id')
+#     image_id=request.args.get("image_id")
+#     if not user_id and not image_id:
+#         return jsonify({"error" : "User_id and image_id required"})
+    
+#     conversation = Chat_messages.query.filter(
+#         ((Chat_messages.sender_id == user_id) & (Chat_messages.receiver_id == image_id)) |
+#         ((Chat_messages.sender_id == image_id) & (Chat_messages.receiver_id == user_id))
+#     ).order_by(Chat_messages.timestamp).all()
+
+#     messages = [{"sender": c.sender_id, "message": c.message ,"timestamp": c.timestamp.isoformat()} for c in conversation]
+#     return jsonify(messages)
  
 @app.route("/delete_chat", methods=["DELETE"])
 @cross_origin(
