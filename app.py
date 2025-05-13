@@ -595,7 +595,7 @@ def chat():
 
 #     return jsonify({"response": response})
 @socketio.on("chat_history")
-@jwt_required()  # Protect the event with JWT authentication
+# @jwt_required()  # Protect the event with JWT authentication
 def handle_chat_history(data):
     try:
         # If data is a string, parse it into a dictionary
