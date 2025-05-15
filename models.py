@@ -4,12 +4,14 @@ from datetime import datetime
 db = SQLAlchemy()
 
 class User(db.Model):
-    __tabelname__ = 'user'
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), nullable=False, unique=True)
     password = db.Column(db.String(500), nullable=False)    
     tokens = db.Column(db.Integer, default=200)# default tokens added
+    plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'))  # user subscribed plan
+    plan = db.relationship('Plans')
  
 
 class ImageData(db.Model):

@@ -5,6 +5,11 @@ from utiles.globalllm import GroqLLM
 from flask import Flask, request, jsonify
 from sqlalchemy import or_
 import os
+import secrets
+from flask import Flask, redirect, url_for, session, jsonify, request
+from authlib.integrations.flask_client import OAuth
+from flask_jwt_extended import create_access_token
+from models import User, db  # adjust as needed
 import tempfile
 import requests
 from utiles.utils import build_system_prompt, ImageProcessing,get_image
@@ -21,10 +26,27 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import *
 from flask_jwt_extended import (
     JWTManager, create_access_token,
-    jwt_required
+    jwt_required, get_jwt_identity
+)
+import secrets
+app = Flask(__name__)
+
+#secret token key
+secret_token_key = secrets.token_hex(16)
+# print("generated secret key is:",secret_token_key)
+ 
+app.secret_key = secret_token_key
+oauth = OAuth(app)
+
+# Configure Google OAuth
+google = oauth.register(
+    name='google',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url=os.getenv("GOOGLE_DISCOVERY_URL"),
+    client_kwargs={'scope': 'openid email profile'}
 )
 
-app = Flask(__name__)
 
 #DBCONFIGER
 # Local MySQL Database Configuration (fallback to SQLite for development)
@@ -66,6 +88,78 @@ groq_llm = GroqLLM(model="llama-3.3-70b-versatile", api_key=API_KEY,temperature=
 
 
 #register login and password change routes****************
+
+@app.route('/login/google')
+def login_with_google():
+    nonce = secrets.token_hex(16)
+    session['nonce'] = nonce
+
+    redirect_uri = url_for('google_callback', _external=True)
+    return google.authorize_redirect(redirect_uri, nonce=nonce)
+
+@app.route('/google/callback')
+def google_callback():
+    try:
+        # Step 1: Authorize token
+        token = google.authorize_access_token()
+
+        nonce = session.get('nonce')
+        if not nonce:
+            return jsonify({'error': 'Nonce missing from session'}), 400
+
+        # Step 2: Get user info
+        user_info = google.parse_id_token(token, nonce=nonce)
+        if not user_info:
+            return jsonify({'error': 'Failed to retrieve user info'}), 400
+
+        email = user_info.get('email')
+        name = user_info.get('name')
+
+        if not email:
+            return jsonify({'error': 'Email not provided by Google'}), 400
+
+        # Step 3: Check if user exists
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            # Existing user - do not change tokens
+            access_token = create_access_token(identity=str(user.id))
+            session['access_token'] = access_token
+
+            return jsonify({
+                'message': 'Login successful',
+                'user_id': user.id,
+                'user_name': user.name,
+                'user_email': user.email,
+                'tokens': user.tokens,
+                'access_token': access_token
+            }), 200
+
+        else:
+            # New user - give 200 tokens
+            user = User(
+                email=email,
+                name=name,
+                password="",  # Placeholder since it's Google login
+                tokens=200
+            )
+            db.session.add(user)
+            db.session.commit()
+
+            access_token = create_access_token(identity=str(user.id))
+            session['access_token'] = access_token
+
+            return jsonify({
+                'message': 'Signup successful - 200 free tokens granted',
+                'user_id': user.id,
+                'user_name': user.name,
+                'user_email': user.email,
+                'tokens': user.tokens,
+                'access_token': access_token
+            }), 200
+
+    except Exception as e:
+        return jsonify({'error': 'Google login failed', 'message': str(e)}), 400
  
 @app.route('/register', methods=['POST'])
 @cross_origin(
@@ -444,7 +538,6 @@ def get_images():
     
 #     except Exception as e:
 #         return jsonify({"error": str(e)}),500
-
 @app.route('/add_token', methods=['PUT'])
 @cross_origin(
     origins="*",
@@ -472,13 +565,21 @@ def add_tokens():
         if not plan:
             return jsonify({"error": "Plan not found"}), 404
 
-        # Add tokens from plan to user
+        # Update user's tokens and assign the purchased plan
         user.tokens += plan.plan_tokens
+        user.plan_id = plan.id  # Store which plan was purchased
         db.session.commit()
 
         return jsonify({
-            "message": "Tokens added successfully",
+            "message": "Plan purchased and tokens added successfully",
             "user_id": user_id,
+            "purchased_plan": {
+                "plan_id": plan.id,
+                "plan_name": plan.plan_name,
+                "plan_price": plan.plan_price,
+                "plan_tokens": plan.plan_tokens,
+                "plan_duration": plan.plan_duration
+            },
             "added_tokens": plan.plan_tokens,
             "total_tokens": user.tokens
         }), 200
@@ -486,7 +587,6 @@ def add_tokens():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/chat", methods=["POST"])
 @cross_origin(
@@ -739,6 +839,43 @@ def get_plans():
     } for plan in plans]), 200
 
 
+#*****************************login via google account******************************#
+@app.route('/api/user/usage', methods=['GET'])
+def get_user_usage():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if not user.plan:
+        return jsonify({'error': 'User has not purchased a plan'}), 400
+
+    plan = user.plan
+
+    total_tokens = plan.plan_tokens
+    tokens_remaining = user.tokens
+    tokens_used = max(0, total_tokens - tokens_remaining)
+    token_price = plan.plan_price / total_tokens
+    value_used_usd = round(tokens_used * token_price, 2)
+
+    return jsonify({
+        'user_id': user.id,
+        'user_name': user.name,
+        'plan': {
+            'plan_id': plan.id,
+            'plan_name': plan.plan_name,
+            'plan_price': plan.plan_price,
+            'plan_duration': plan.plan_duration,
+            'plan_tokens': total_tokens
+        },
+        'tokens_remaining': tokens_remaining,
+        'tokens_used': tokens_used,
+        'value_used_usd': value_used_usd
+    }), 200
+
 if __name__ == "__main__":
-    socketio.run(app, debug=True, host="0.0.0.0", port=8001)
+    socketio.run(app, debug=True, host="127.0.0.1", port=8001)
     # app.run(debug=True, host="0.0.0.0", port=8001)
