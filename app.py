@@ -16,7 +16,6 @@ from utiles.utils import build_system_prompt, ImageProcessing,get_image
 from flask_cors import CORS
 from flask_cors import cross_origin
 from dotenv import load_dotenv
-import os
 import json
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify,send_from_directory, abort
@@ -28,7 +27,6 @@ from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required, get_jwt_identity
 )
-import secrets
 app = Flask(__name__)
 
 #secret token key
@@ -91,6 +89,7 @@ groq_llm = GroqLLM(model="llama-3.3-70b-versatile", api_key=API_KEY,temperature=
 
 @app.route('/login/google')
 def login_with_google():
+    session.clear()
     nonce = secrets.token_hex(16)
     session['nonce'] = nonce
 
@@ -839,7 +838,6 @@ def get_plans():
     } for plan in plans]), 200
 
 
-#*****************************login via google account******************************#
 @app.route('/api/user/usage', methods=['GET'])
 def get_user_usage():
     user_id = request.args.get('user_id')
@@ -877,5 +875,5 @@ def get_user_usage():
     }), 200
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True, host="127.0.0.1", port=8001)
-    # app.run(debug=True, host="0.0.0.0", port=8001)
+    print("Starting server now...")
+    socketio.run(app, host='0.0.0.0', port=8001, debug=True)
