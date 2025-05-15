@@ -876,6 +876,6 @@ def get_user_usage():
         'value_used_usd': value_used_usd
     }), 200
 
-if __name__ == "__main__":
-    socketio.run(app, debug=True, host="127.0.0.1", port=8001)
-    # app.run(debug=True, host="0.0.0.0", port=8001)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, host='0.0.0.0', port=port)
