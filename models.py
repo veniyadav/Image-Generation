@@ -30,3 +30,11 @@ class Chat_messages(db.Model):
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     is_sender = db.Column(db.Boolean, nullable=False) 
+
+class Plans(db.Model):
+    __tablename__ = 'plans'
+    id = db.Column(db.Integer, primary_key=True)
+    plan_name = db.Column(db.String(50), nullable=False)
+    plan_price = db.Column(db.Float, nullable=False)
+    plan_duration = db.Column(db.String(50), nullable=False)  # e.g., "1 month", "1 year"
+    plan_tokens = db.Column(db.Integer, nullable=False)  # Number of tokens included in the plan

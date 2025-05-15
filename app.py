@@ -3,6 +3,7 @@ from groq import Groq
 from flask_socketio import emit
 from utiles.globalllm import GroqLLM
 from flask import Flask, request, jsonify
+from sqlalchemy import or_
 import os
 import tempfile
 import requests
@@ -415,7 +416,36 @@ def get_images():
     return jsonify(result), 200
 
 
-@app.route('/add_token', methods =['PUT'])
+# @app.route('/add_token', methods =['PUT'])
+# @cross_origin(
+#     origins="*",
+#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+#     supports_credentials=True,
+#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+# )
+# @jwt_required()
+# def add_tokens():
+#     try :
+#         data  = request.get_json()
+#         user_id = data.get("user_id")
+
+#         if not user_id:
+#             return jsonify({"error":" User ID required"}),404
+        
+#         #detect user from the database
+#         user =  User.query.filter_by(id=user_id).first()
+#         if not user:
+#             return jsonify({"error":"User not found"})
+         
+#         #adding 100 tokens to the user's account
+#         user.tokens += 100
+#         db.session.commit()
+#         return jsonify({"message":"Tokens added successfully", "user_id": user_id, "New_added_tokens": user.tokens}), 200
+    
+#     except Exception as e:
+#         return jsonify({"error": str(e)}),500
+
+@app.route('/add_token', methods=['PUT'])
 @cross_origin(
     origins="*",
     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
@@ -424,25 +454,38 @@ def get_images():
 )
 @jwt_required()
 def add_tokens():
-    try :
-        data  = request.get_json()
+    try:
+        data = request.get_json()
         user_id = data.get("user_id")
+        plan_id = data.get("plan_id")
 
-        if not user_id:
-            return jsonify({"error":" User ID required"}),404
-        
-        #detect user from the database
-        user =  User.query.filter_by(id=user_id).first()
+        if not user_id or not plan_id:
+            return jsonify({"error": "User ID and Plan ID are required"}), 400
+
+        # Find user
+        user = User.query.filter_by(id=user_id).first()
         if not user:
-            return jsonify({"error":"User not found"})
-         
-        #adding 100 tokens to the user's account
-        user.tokens += 100
+            return jsonify({"error": "User not found"}), 404
+
+        # Find plan
+        plan = Plans.query.filter_by(id=plan_id).first()
+        if not plan:
+            return jsonify({"error": "Plan not found"}), 404
+
+        # Add tokens from plan to user
+        user.tokens += plan.plan_tokens
         db.session.commit()
-        return jsonify({"message":"Tokens added successfully", "user_id": user_id, "New_added_tokens": user.tokens}), 200
-    
+
+        return jsonify({
+            "message": "Tokens added successfully",
+            "user_id": user_id,
+            "added_tokens": plan.plan_tokens,
+            "total_tokens": user.tokens
+        }), 200
+
     except Exception as e:
-        return jsonify({"error": str(e)}),500
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/chat", methods=["POST"])
@@ -516,86 +559,9 @@ def chat():
 
     return jsonify({"response": response})
 
-# @socketio.on("join_room")
-# def handle_join_room(data):
-#     user_id = data.get("user_id")
-#     image_id = data.get("image_id")
-#     if user_id and image_id:
-#         room_name = f"chat_{min(user_id, image_id)}_{max(user_id, image_id)}"
-#         join_room(room_name)
-#         print(f"User {user_id} joined room {room_name}")
-#         emit("joined", {"room": room_name})
-
-
-# # ROUTE: Chat with Real-Time Emit
-# @app.route("/chat", methods=["POST"])
-# @cross_origin(
-#     origins="*",
-#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
-#     supports_credentials=True,
-#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-# )
-# @jwt_required()
-# def chat():
-#     data = request.get_json()
-#     if not data or "image_id" not in data or "human_msg" not in data or "user_id" not in data:
-#         return jsonify({"error": "Missing required parameters"}), 400
-
-#     sender_id = int(data["user_id"])
-#     receiver_id = int(data["image_id"])
-#     human_msg = data["human_msg"]
-
-#     image_data = ImageData.query.filter_by(id=receiver_id).first()
-#     if not image_data:
-#         return jsonify({"error": "Image not found"}), 404
-
-#     system_prompt = (image_data.prompt or "").strip()
-#     prompt = ChatPromptTemplate.from_messages([
-#         ("system", system_prompt),
-#         ("human", human_msg.strip())
-#     ])
-#     chain = prompt | groq_llm
-#     response = chain.invoke({})
-
-#     # Store and emit user message
-#     human_entry = Chat_messages(
-#         sender_id=sender_id,
-#         receiver_id=receiver_id,
-#         message=human_msg,
-#         is_sender=True
-#     )
-#     db.session.add(human_entry)
-#     db.session.commit()
-
-#     # Store and emit AI response
-#     ai_entry = Chat_messages(
-#         sender_id=receiver_id,
-#         receiver_id=sender_id,
-#         message=response,
-#         is_sender=False
-#     )
-#     db.session.add(ai_entry)
-#     db.session.commit()
-
-#     # Emit to room
-#     room_name = f"chat_{min(sender_id, receiver_id)}_{max(sender_id, receiver_id)}"
-#     socketio.emit("new_message", {
-#         "sender_id": sender_id,
-#         "receiver_id": receiver_id,
-#         "message": human_msg,
-#         "timestamp": human_entry.timestamp.isoformat()
-#     }, to=room_name)
-
-#     socketio.emit("new_message", {
-#         "sender_id": receiver_id,
-#         "receiver_id": sender_id,
-#         "message": response,
-#         "timestamp": ai_entry.timestamp.isoformat()
-#     }, to=room_name)
-
-#     return jsonify({"response": response})
+ 
 @socketio.on("chat_history")
-@jwt_required()  # Protect the event with JWT authentication
+# @jwt_required()  # Protect the event with JWT authentication
 def handle_chat_history(data):
     try:
         # If data is a string, parse it into a dictionary
@@ -633,28 +599,6 @@ def handle_chat_history(data):
         print("Error handling chat history:", e)
         emit("chat_history", {"error": "An error occurred while fetching the chat history"})
 
-
-# @app.route("/chat_history", methods=["GET"])
-# @cross_origin(
-#     origins="*",
-#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
-#     supports_credentials=True,
-#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-# )
-# @jwt_required()
-# def get_conversation():
-#     user_id=request.args.get('user_id')
-#     image_id=request.args.get("image_id")
-#     if not user_id and not image_id:
-#         return jsonify({"error" : "User_id and image_id required"})
-    
-#     conversation = Chat_messages.query.filter(
-#         ((Chat_messages.sender_id == user_id) & (Chat_messages.receiver_id == image_id)) |
-#         ((Chat_messages.sender_id == image_id) & (Chat_messages.receiver_id == user_id))
-#     ).order_by(Chat_messages.timestamp).all()
-
-#     messages = [{"sender": c.sender_id, "message": c.message ,"timestamp": c.timestamp.isoformat()} for c in conversation]
-#     return jsonify(messages)
  
 @app.route("/delete_chat", methods=["DELETE"])
 @cross_origin(
@@ -689,6 +633,111 @@ def delete_chat():
  
     return jsonify({"message": "Chat messages deleted successfully"}), 200
    
+
+@app.route('/message_count', methods=['GET'])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+@jwt_required()
+def get_message_count():
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
+    try:
+        # Count messages sent by the user
+        sent_count = db.session.query(Chat_messages).filter(Chat_messages.sender_id == user_id).count()
+
+        # Count messages received by the user
+        received_count = db.session.query(Chat_messages).filter(Chat_messages.receiver_id == user_id).count()
+
+        # Total count (sent or received)
+        total_count = db.session.query(Chat_messages).filter(
+            or_(Chat_messages.sender_id == user_id, Chat_messages.receiver_id == user_id)
+        ).count()
+
+        return jsonify({
+            "user_id": user_id,
+            "sent_messages": sent_count,
+            "received_messages": received_count,
+            "total_messages": total_count
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+   # Create a plan
+@app.route('/plans', methods=['POST'])
+# @cross_origin(
+#     origins="*",
+#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+#     supports_credentials=True,
+#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+# )
+# @jwt_required()
+def add_plan():
+    data = request.get_json()
+
+    try:
+        new_plan = Plans(
+            plan_name=data['plan_name'],
+            plan_price=data['plan_price'],
+            plan_duration=data['plan_duration'],
+            plan_tokens=data['plan_tokens']
+        )
+        db.session.add(new_plan)
+        db.session.commit()
+        return jsonify({'message': 'Plan added successfully', 'plan_id': new_plan.id}), 201
+
+    except KeyError as e:
+        return jsonify({'error': f'Missing field: {str(e)}'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Delete a plan
+@app.route('/plans', methods=['DELETE'])
+# @cross_origin(
+#     origins="*",
+#     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+#     supports_credentials=True,
+#     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+# )
+# @jwt_required()
+def delete_plan():
+    data = request.get_json()
+    plan_id = data.get('plan_id')
+
+    if not plan_id:
+        return jsonify({'error': 'Plan ID is required'}), 400
+    plan = Plans.query.get(plan_id)
+    if not plan:
+        return jsonify({'error': 'Plan not found'}), 404
+
+    try:
+        db.session.delete(plan)
+        db.session.commit()
+        return jsonify({'message': 'Plan deleted successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Get all plans
+@app.route('/plans', methods=['GET'])
+def get_plans():
+    plans = Plans.query.all()
+    return jsonify([{
+        'id': plan.id,
+        'plan_name': plan.plan_name,
+        'plan_price': plan.plan_price,
+        'plan_duration': plan.plan_duration,
+        'plan_tokens': plan.plan_tokens
+    } for plan in plans]), 200
+
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, host="0.0.0.0", port=8001)
