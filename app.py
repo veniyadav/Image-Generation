@@ -125,14 +125,10 @@ def google_callback():
             access_token = create_access_token(identity=str(user.id))
             session['access_token'] = access_token
 
-            return jsonify({
-                'message': 'Login successful',
-                'user_id': user.id,
-                'user_name': user.name,
-                'user_email': user.email,
-                'tokens': user.tokens,
-                'access_token': access_token
-            }), 200
+            Base_url="https://illustrious-horse-fbf3f5.netlify.app"
+            frontend_url = f"{Base_url}/google-auth-callback"  # or your production domain
+            redirect_url = f"{frontend_url}?token={access_token}&user_id={user.id}&user_name={user.name}"
+            return redirect(redirect_url)
 
         else:
             # New user - give 200 tokens
