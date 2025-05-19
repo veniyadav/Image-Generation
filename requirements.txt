@@ -14,4 +14,3 @@ Flask-SocketIO
 eventlet
 pymysql
 sqlalchemy
-authlib

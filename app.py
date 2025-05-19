@@ -48,7 +48,7 @@ google = oauth.register(
 
 #DBCONFIGER
 # Local MySQL Database Configuration (fallback to SQLite for development)
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/image_generation'
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/image_generation'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:dtyxtGrcajPlvDLILFCfgVdWFwwCvTdD@metro.proxy.rlwy.net:41157/railway'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
@@ -148,18 +148,13 @@ def google_callback():
             access_token = create_access_token(identity=str(user.id))
             session['access_token'] = access_token
 
-            return jsonify({
-                'message': 'Signup successful - 200 free tokens granted',
-                'user_id': user.id,
-                'user_name': user.name,
-                'user_email': user.email,
-                'tokens': user.tokens,
-                'access_token': access_token
-            }), 200
+            frontend_url = "http://localhost:3000/google-auth-callback"  # or your production domain
+            redirect_url = f"{frontend_url}?token={access_token}&user_id={user.id}&user_name={user.name}"
+            return redirect(redirect_url)
 
     except Exception as e:
         return jsonify({'error': 'Google login failed', 'message': str(e)}), 400
- 
+    
 @app.route('/register', methods=['POST'])
 @cross_origin(
     origins="*",
