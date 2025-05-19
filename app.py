@@ -507,7 +507,7 @@ def get_images():
 
     return jsonify(result), 200
 
-@app.route('/image_data',methods=['DELETE'])
+@app.route('/image_data_delete',methods=['DELETE'])
 @cross_origin(
     origins="*",
     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
