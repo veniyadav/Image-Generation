@@ -48,7 +48,7 @@ google = oauth.register(
 
 #DBCONFIGER
 # Local MySQL Database Configuration (fallback to SQLite for development)
-#app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/image_generation'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/image_generation'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:dtyxtGrcajPlvDLILFCfgVdWFwwCvTdD@metro.proxy.rlwy.net:41157/railway'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
@@ -148,7 +148,8 @@ def google_callback():
             access_token = create_access_token(identity=str(user.id))
             session['access_token'] = access_token
 
-            frontend_url = "http://localhost:3000/google-auth-callback"  # or your production domain
+            Base_url="https://illustrious-horse-fbf3f5.netlify.app"
+            frontend_url = f"{Base_url}/google-auth-callback"  # or your production domain
             redirect_url = f"{frontend_url}?token={access_token}&user_id={user.id}&user_name={user.name}"
             return redirect(redirect_url)
 
@@ -330,7 +331,7 @@ def generate_image_endpoint():
         if not user_id:
             return jsonify({"error": "User ID is required"}), 400
 
-        if not any([body_shape, breast_size, butt_size, skin_color, eye_color, hair_color, hair_style, gender]):
+        if not any([body_shape, breast_size, butt_size, skin_color, eye_color, hair_color, hair_style, gender, age]):
             return jsonify({"error": "At least one descriptive field is required"}), 400
 
         # Construct the prompt
@@ -431,6 +432,9 @@ def analyze_image():
     personality2=request.form.get("personality2","naughty")
     personality3=request.form.get("personality3","bold")
 
+    if not name or not age:
+        return jsonify({"error": "Name and age are required"}), 400
+
     try:
         # Analyze the image
         physical_description = ImageProcessing(file_path)
@@ -503,6 +507,34 @@ def get_images():
 
     return jsonify(result), 200
 
+@app.route('/image_data',methods=['DELETE'])
+@cross_origin(
+    origins="*",
+    allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
+@jwt_required()
+def delete_image():
+    data = request.get_json()
+    image_id = data.get("image_id")
+
+    if not image_id:
+        return jsonify({"error": "Image ID is required"}), 400
+
+    try:
+        image_data = ImageData.query.filter_by(id=image_id).first()
+        if not image_data:
+            return jsonify({"error": "Image not found"}), 404
+
+        db.session.delete(image_data)
+        db.session.commit()
+
+        return jsonify({"message": "Image deleted successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 # @app.route('/add_token', methods =['PUT'])
 # @cross_origin(
